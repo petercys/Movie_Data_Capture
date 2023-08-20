@@ -216,7 +216,10 @@ def get_data_from_json(
                             json_data[translate_value][i] = special_characters_replacement(
                                 json_data[translate_value][i])
                         list_in_str = ",".join(json_data[translate_value])
-                        json_data[translate_value] = translate(list_in_str).split(',')
+                        translated = translate(list_in_str)
+                        json_data[translate_value] = translated.split(',')
+                        for i in range(len(json_data[translate_value])):
+                            json_data[translate_value][i] = json_data[translate_value][i].strip()
 
     if open_cc:
         cc_vars = conf.cc_convert_vars().split(",")
