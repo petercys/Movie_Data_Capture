@@ -107,7 +107,7 @@ class Scraping:
         # If actor is anonymous, Fill in Anonymous
         if len(json_data['actor']) == 0:
             if config.getInstance().anonymous_fill() == True:
-                if "zh_" in config.getInstance().get_target_language() or "ZH" in config.getInstance().get_target_language():
+                if "zh" in config.getInstance().get_target_language() or "ZH" in config.getInstance().get_target_language():
                     json_data['actor'] = "佚名"
                 else:
                     json_data['actor'] = "Anonymous"
@@ -217,8 +217,8 @@ class Scraping:
                 sources = ["dlsite", "getchu"]
             elif "pcolle" in sources and "pcolle" in lo_file_number:
                 sources = ["pcolle"]
-            elif "fc2" in lo_file_number:
-                sources = ["msin", "fc2", "avsox"]
+            #elif "fc2" in lo_file_number:
+            #    sources = ["msin", "fc2", "avsox"]
             elif (re.search(r"\d+\D+-", file_number) or "siro" in lo_file_number):
                 if "mgstage" in sources:
                     sources = insert(sources, "mgstage")
