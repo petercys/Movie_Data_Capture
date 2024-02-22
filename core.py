@@ -770,6 +770,8 @@ def core_main_no_net_op(movie_path, number):
     if full_nfo.is_file():
         if full_nfo.read_text(encoding='utf-8').find(r'<tag>无码</tag>') >= 0:
             uncensored = True
+        if full_nfo.read_text(encoding='utf-8').find(r'<genre>无码</genre>') >= 0:
+            uncensored = True
         try:
             nfo_xml = etree.parse(full_nfo)
             nfo_fanart_path = nfo_xml.xpath('//fanart/text()')[0]

@@ -28,9 +28,14 @@ class Msin(Parser):
 
     def extraInit(self):
         self.imagecut = 4
+        self.uncensored = True
 
     def search(self, number: str):
-        self.number = number.lower().replace('fc2-ppv-', '').replace('fc2-', '')
+        if re.search(r'(?:-|_|\s)(\d{6,7})$', number.strip()):
+            self.number = re.search(r'(?:-|_|\s)(\d{6,7})$', number.strip()).group(1)
+        else:
+            self.number = number.lower().replace('fc2-ppv-', '').replace('fc2-', '')
+        
         self.cookies = {"age": "off"}
         self.detailurl = 'https://db.msin.jp/search/movie?str=fc2-ppv-' + self.number
         session = request_session(cookies=self.cookies, proxies=self.proxies, verify=self.verify)

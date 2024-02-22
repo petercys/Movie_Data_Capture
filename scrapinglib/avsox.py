@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 
+import re
 from .parser import Parser
 
 
@@ -23,10 +24,17 @@ class Avsox(Parser):
         self.originalnum = ''
 
     def queryNumberUrl(self, number: str):
-        upnum = number.upper()
-        if 'FC2' in upnum and 'FC2-PPV' not in upnum:
+        upnum = number.upper().strip()
+        if re.search(r'(?:-|_|\s)(\d{6,7})$', upnum):
+            number = 'FC2-PPV-' + re.search(r'(?:-|_|\s)(\d{6,7})$', number).group(1)
+            self.number = number
+        elif 'FC2' in upnum and 'FC2-PPV' not in upnum:
             number = upnum.replace('FC2', 'FC2-PPV')
             self.number = number
+            
+        if 'FC2' in self.number:
+            self.uncensored = True
+            
         qurySiteTree = self.getHtmlTree('https://tellme.pw/avsox')
         site = self.getTreeElement(qurySiteTree, '//div[@class="container"]/div/a/@href')
         self.searchtree = self.getHtmlTree(site + '/cn/search/' + number)
