@@ -6,6 +6,7 @@ import uuid
 import json
 import time
 import typing
+import urllib.parse
 from unicodedata import category
 from concurrent.futures import ThreadPoolExecutor
 
@@ -320,8 +321,9 @@ def translate(
         gsite = config.getInstance().get_translate_service_site()
         if not re.match('^translate\.google\.(com|com\.\w{2}|\w{2})$', gsite):
             gsite = 'translate.google.cn'
+        encoded_src = urllib.parse.quote_plus(src)
         url = (
-            f"https://{gsite}/translate_a/single?client=gtx&dt=t&dj=1&ie=UTF-8&sl=auto&tl={target_language}&q={src}"
+            f"https://{gsite}/translate_a/single?client=gtx&dt=t&dj=1&ie=UTF-8&sl=auto&tl={target_language}&q={encoded_src}"
         )
         result = get_html(url=url, return_type="object")
         if not result.ok:

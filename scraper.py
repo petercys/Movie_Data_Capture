@@ -189,37 +189,43 @@ def get_data_from_json(
     if conf.is_translate():
         translate_values = conf.translate_values().split(",")
         for translate_value in translate_values:
-            if json_data[translate_value] == "":
-                continue
-            if translate_value == "title":
-                title_dict = json.loads(
-                    (Path.home() / '.local' / 'share' / 'mdc' / 'c_number.json').read_text(encoding="utf-8"))
-                try:
-                    json_data[translate_value] = title_dict[number]
+            try:
+                if json_data[translate_value] == "":
                     continue
-                except:
-                    pass
-            if conf.get_translate_engine() == "azure":
-                t = translate(
-                    json_data[translate_value],
-                    target_language="zh-Hans",
-                    engine=conf.get_translate_engine(),
-                    key=conf.get_translate_key(),
-                )
-            else:
-                if len(json_data[translate_value]):
-                    if type(json_data[translate_value]) == str:
-                        json_data[translate_value] = special_characters_replacement(json_data[translate_value])
-                        json_data[translate_value] = translate(json_data[translate_value])
-                    else:
-                        for i in range(len(json_data[translate_value])):
-                            json_data[translate_value][i] = special_characters_replacement(
-                                json_data[translate_value][i])
-                        list_in_str = ",".join(json_data[translate_value])
-                        translated = translate(list_in_str)
-                        json_data[translate_value] = translated.split(',')
-                        for i in range(len(json_data[translate_value])):
-                            json_data[translate_value][i] = json_data[translate_value][i].strip()
+                if translate_value == "title":
+                    title_dict = json.loads(
+                        (Path.home() / '.local' / 'share' / 'mdc' / 'c_number.json').read_text(encoding="utf-8"))
+                    try:
+                        json_data[translate_value] = title_dict[number]
+                        continue
+                    except:
+                        pass
+                if conf.get_translate_engine() == "azure":
+                    t = translate(
+                        json_data[translate_value],
+                        target_language="zh-Hans",
+                        engine=conf.get_translate_engine(),
+                        key=conf.get_translate_key(),
+                    )
+                else:
+                    if len(json_data[translate_value]):
+                        if type(json_data[translate_value]) == str:
+                            json_data[translate_value] = special_characters_replacement(json_data[translate_value])
+                            json_data[translate_value] = translate(json_data[translate_value])
+                        else:
+                            for i in range(len(json_data[translate_value])):
+                                json_data[translate_value][i] = special_characters_replacement(
+                                    json_data[translate_value][i])
+                            list_in_str = ",".join(json_data[translate_value])
+                            translated = translate(list_in_str)
+                            if ',' in translated:
+                                json_data[translate_value] = translated.split(',')
+                            elif '、' in translated:
+                                json_data[translate_value] = translated.split('、')
+                            for i in range(len(json_data[translate_value])):
+                                json_data[translate_value][i] = json_data[translate_value][i].strip()
+            except:
+                continue
 
     if open_cc:
         cc_vars = conf.cc_convert_vars().split(",")
