@@ -1036,7 +1036,7 @@ def core_main(movie_path, number_th, oCC, specified_source=None, specified_url=N
                 pass
 
         # 裁剪图
-        cutImage(imagecut, path, fanart_path, poster_path, bool(conf.face_uncensored_only() and not uncensored))
+        cutImage(imagecut, path, thumb_path, poster_path, bool(conf.face_uncensored_only() and not uncensored))
 
         # 添加水印
         if conf.is_watermark():
