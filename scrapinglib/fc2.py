@@ -10,6 +10,8 @@ from .parser import Parser
 class Fc2(Parser):
     source = 'fc2'
 
+    expr_fc2_num = r"(?:FC|fc).*?(?:PPV|ppv)?[\-\_]?\s*([1-9][\d]{5,6})"
+
     expr_title = '/html/head/title/text()'
     expr_studio = '//*[@id="top"]/div[1]/section[1]/div/section/div[2]/ul/li[3]/a/text()'
     expr_release = '//*[@id="top"]/div[1]/section[1]/div/section/div[2]/div[2]/p/text()'
@@ -26,8 +28,8 @@ class Fc2(Parser):
         self.uncensored = True
 
     def search(self, number):
-        if re.search(r'(?:-|_|\s)(\d{6,7})$', number.strip()):
-            self.number = re.search(r'(?:-|_|\s)(\d{6,7})$', number.strip()).group(1)
+        if re.search(self.expr_fc2_num, number.strip().upper()):
+            self.number = re.search(self.expr_fc2_num, number.strip().upper()).group(1)
         else:
             self.number = number.lower().replace('fc2-ppv-', '').replace('fc2-', '')
         if self.specifiedUrl:

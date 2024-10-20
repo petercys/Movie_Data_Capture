@@ -191,6 +191,9 @@ class Config:
 
     def auto_exit(self) -> bool:
         return self.conf.getboolean("common", "auto_exit")
+    
+    def skip_existing_nfo(self) -> bool:
+        return self.conf.getboolean("common", "skip_existing_nfo", fallback=False)
 
     def translate_to_sc(self) -> bool:
         return self.conf.getboolean("common", "translate_to_sc")
@@ -227,6 +230,9 @@ class Config:
 
     def stop_counter(self) -> int:
         return self.conf.getint("advenced_sleep", "stop_counter", fallback=0)
+    
+    def ignore_file_size_less_than_mb(self) -> int:
+        return self.conf.getint("common", "ignore_file_size_less_than_mb", fallback=0)
 
     def rerun_delay(self) -> int:
         value = self.conf.get("advenced_sleep", "rerun_delay")
@@ -453,6 +459,7 @@ class Config:
         conf.set(sec1, "scan_hardlink", "0")
         conf.set(sec1, "failed_move", "1")
         conf.set(sec1, "auto_exit", "0")
+        conf.set(sec1, "skip_existing_nfo", "0")
         conf.set(sec1, "translate_to_sc", "1")
         # actor_gender value: female or male or both or all(含人妖)
         conf.set(sec1, "actor_gender", "female")
@@ -465,6 +472,7 @@ class Config:
         conf.set(sec1, "actor_only_tag", "0")
         conf.set(sec1, "sleep", "3")
         conf.set(sec1, "anonymous_fill", "0")
+        conf.set(sec1, "ignore_file_size_less_than_mb", 0)
 
         sec2 = "advenced_sleep"
         conf.add_section(sec2)

@@ -1,9 +1,15 @@
+# This code adds the vendor directory to Python's path so it can find the modules
+import os
+import sys
+
+parent_dir = os.path.abspath(os.path.dirname(__file__))
+vendor_dir = os.path.join(parent_dir, 'vendor/lib/python3.5/site-packages')
+sys.path.append(vendor_dir)
+
 import argparse
 import json
-import os
 import random
 import re
-import sys
 import time
 import shutil
 import typing
@@ -61,8 +67,11 @@ def argparse_function(ver: str) -> typing.Tuple[str, str, str, str, bool, bool, 
                         help="Delay (eg. 1h10m30s or 60 (second)) time and rerun, until all movies proceed. Note: stop_counter value in config or -c must none zero.")
     parser.add_argument("-i", "--ignore-failed-list", action="store_true", help="Ignore failed list '{}'".format(
         os.path.join(os.path.abspath(conf.failed_folder()), 'failed_list.txt')))
+    parser.add_argument("-f", "--ignore-file-size-less-than-mb", default='', nargs='?', help='Ignore video file size less than X')
     parser.add_argument("-a", "--auto-exit", action="store_true",
                         help="Auto exit after program complete")
+    parser.add_argument("-x", "--skip-existing-nfo", action="store_true",
+                        help="Skip existing NFO files")
     parser.add_argument("-g", "--debug", action="store_true",
                         help="Turn on debug mode to generate diagnostic log for issue report.")
     parser.add_argument("-N", "--no-network-operation", action="store_true",
@@ -99,9 +108,11 @@ is performed. It may help you correct wrong numbers before real job.""")
     set_natural_number_or_none("common:link_mode", args.link_mode)
     set_str_or_none("common:source_folder", args.path)
     set_bool_or_none("common:auto_exit", args.auto_exit)
+    set_bool_or_none("common:skip_existing_nfo", args.skip_existing_nfo)
     set_natural_number_or_none("common:nfo_skip_days", args.days)
     set_natural_number_or_none("advenced_sleep:stop_counter", args.cnt)
     set_bool_or_none("common:ignore_failed_list", args.ignore_failed_list)
+    set_str_or_none("common:ignore_file_size_less_than_mb", args.ignore_file_size_less_than_mb)
     set_str_or_none("advenced_sleep:rerun_delay", args.delaytm)
     set_str_or_none("priority:website", args.site)
     if isinstance(args.dnimg, bool) and args.dnimg:
@@ -557,37 +568,37 @@ def main(args: tuple) -> Path:
                     ) if not single_file_path else ('-', 'Single File', '', '', ''))
           )
 
-    if conf.update_check():
-        try:
-            check_update(version)
-            # Download Mapping Table, parallel version
-            def fmd(f) -> typing.Tuple[str, Path]:
-                return ('https://raw.githubusercontent.com/yoshiko2/Movie_Data_Capture/master/MappingTable/' + f,
-                        Path.home() / '.local' / 'share' / 'mdc' / f)
+    # if conf.update_check():
+    #     try:
+    #         check_update(version)
+    #         # Download Mapping Table, parallel version
+    #         def fmd(f) -> typing.Tuple[str, Path]:
+    #             return ('https://raw.githubusercontent.com/yoshiko2/Movie_Data_Capture/master/MappingTable/' + f,
+    #                     Path.home() / '.local' / 'share' / 'mdc' / f)
 
-            map_tab = (fmd('mapping_actor.xml'), fmd('mapping_info.xml'), fmd('c_number.json'))
-            for k, v in map_tab:
-                if v.exists():
-                    if file_modification_days(str(v)) >= conf.mapping_table_validity():
-                        print("[+]Mapping Table Out of date! Remove", str(v))
-                        os.remove(str(v))
-            res = parallel_download_files(((k, v) for k, v in map_tab if not v.exists()))
-            for i, fp in enumerate(res, start=1):
-                if fp and len(fp):
-                    print(f"[+] [{i}/{len(res)}] Mapping Table Downloaded to {fp}")
-                else:
-                    print(f"[-] [{i}/{len(res)}] Mapping Table Download failed")
-        except:
-            print("[!]" + " WARNING ".center(54, "="))
-            print('[!]' + '-- GITHUB CONNECTION FAILED --'.center(54))
-            print('[!]' + 'Failed to check for updates'.center(54))
-            print('[!]' + '& update the mapping table'.center(54))
-            print("[!]" + "".center(54, "="))
-            try:
-                etree.parse(str(Path.home() / '.local' / 'share' / 'mdc' / 'mapping_actor.xml'))
-            except:
-                print('[!]' + "Failed to load mapping table".center(54))
-                print('[!]' + "".center(54, "="))
+    #         map_tab = (fmd('mapping_actor.xml'), fmd('mapping_info.xml'), fmd('c_number.json'))
+    #         for k, v in map_tab:
+    #             if v.exists():
+    #                 if file_modification_days(str(v)) >= conf.mapping_table_validity():
+    #                     print("[+]Mapping Table Out of date! Remove", str(v))
+    #                     os.remove(str(v))
+    #         res = parallel_download_files(((k, v) for k, v in map_tab if not v.exists()))
+    #         for i, fp in enumerate(res, start=1):
+    #             if fp and len(fp):
+    #                 print(f"[+] [{i}/{len(res)}] Mapping Table Downloaded to {fp}")
+    #             else:
+    #                 print(f"[-] [{i}/{len(res)}] Mapping Table Download failed")
+    #     except:
+    #         print("[!]" + " WARNING ".center(54, "="))
+    #         print('[!]' + '-- GITHUB CONNECTION FAILED --'.center(54))
+    #         print('[!]' + 'Failed to check for updates'.center(54))
+    #         print('[!]' + '& update the mapping table'.center(54))
+    #         print("[!]" + "".center(54, "="))
+    #         try:
+    #             etree.parse(str(Path.home() / '.local' / 'share' / 'mdc' / 'mapping_actor.xml'))
+    #         except:
+    #             print('[!]' + "Failed to load mapping table".center(54))
+    #             print('[!]' + "".center(54, "="))
 
     create_failed_folder(conf.failed_folder())
 
@@ -608,7 +619,14 @@ def main(args: tuple) -> Path:
             time.sleep(int(config.getInstance().sleep()))
         os._exit(0)
 
-    if not single_file_path == '':  # Single File
+    is_single_file = not single_file_path == ''
+    is_single_file_path_a_file = True
+
+    if is_single_file:
+        is_single_file_path_a_file = not os.path.isdir(single_file_path)
+
+
+    if is_single_file and is_single_file_path_a_file:  # Single File
         print('[+]==================== Single File =====================')
         if custom_number == '':
             create_data_and_move_with_custom_number(single_file_path,

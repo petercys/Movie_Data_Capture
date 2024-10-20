@@ -9,6 +9,8 @@ from .parser import Parser
 class Msin(Parser):
     source = 'msin'
 
+    expr_fc2_num = r"(?:FC|fc).*?(?:PPV|ppv)?[\-\_]?\s*([1-9][\d]{5,6})"
+
     expr_number = '//div[@class="mv_fileName"]/text()'
     expr_title = '//div[@class="mv_title"]/text()'
     expr_title_unsubscribe = '//div[@class="mv_title unsubscribe"]/text()'
@@ -31,8 +33,8 @@ class Msin(Parser):
         self.uncensored = True
 
     def search(self, number: str):
-        if re.search(r'(?:-|_|\s)(\d{6,7})$', number.strip()):
-            self.number = re.search(r'(?:-|_|\s)(\d{6,7})$', number.strip()).group(1)
+        if re.search(self.expr_fc2_num, number.strip().upper()):
+            self.number = re.search(self.expr_fc2_num, number.strip().upper()).group(1)
         else:
             self.number = number.lower().replace('fc2-ppv-', '').replace('fc2-', '')
         

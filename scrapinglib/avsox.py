@@ -7,6 +7,8 @@ from .parser import Parser
 class Avsox(Parser):
     source = 'avsox'
 
+    expr_fc2_num = r"(?:FC|fc).*?(?:PPV|ppv)?[\-\_]?\s*([1-9][\d]{5,6})"
+
     expr_number = '//span[contains(text(),"识别码:")]/../span[2]/text()'
     expr_actor = '//a[@class="avatar-box"]'
     expr_actorphoto = '//a[@class="avatar-box"]'
@@ -25,8 +27,8 @@ class Avsox(Parser):
 
     def queryNumberUrl(self, number: str):
         upnum = number.upper().strip()
-        if re.search(r'(?:-|_|\s)(\d{6,7})$', upnum):
-            number = 'FC2-PPV-' + re.search(r'(?:-|_|\s)(\d{6,7})$', number).group(1)
+        if re.search(self.expr_fc2_num, upnum):
+            number = 'FC2-PPV-' + re.search(self.expr_fc2_num, number).group(1)
             self.number = number
         elif 'FC2' in upnum and 'FC2-PPV' not in upnum:
             number = upnum.replace('FC2', 'FC2-PPV')
