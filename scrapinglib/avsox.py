@@ -65,7 +65,10 @@ class Avsox(Parser):
         return super().getTitle(htmltree).replace('/', '').strip(self.originalnum).strip()
 
     def getStudio(self, htmltree):
-        return super().getStudio(htmltree).replace("', '", ' ')
+        studio = super().getStudio(htmltree).replace("', '", ' ')
+        if studio.strip().lower() == 'fc2-ppv':
+            studio = super().getLabel(htmltree).strip()
+        return studio
 
     def getSmallCover(self, htmltree):
         """ 使用搜索页面的预览小图
