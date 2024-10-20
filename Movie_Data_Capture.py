@@ -18,8 +18,10 @@ import signal
 import platform
 import config
 
+import scrapinglib.utils as sutils
+
 from datetime import datetime, timedelta
-from lxml import etree
+from lxml import etree, html
 from pathlib import Path
 from opencc import OpenCC
 
@@ -455,7 +457,7 @@ def rm_empty_folder(path):
             pass
 
 
-def create_data_and_move(movie_path: str, zero_op: bool, no_net_op: bool, oCC):
+def create_data_and_move(movie_path: str, zero_op: bool, no_net_op: bool, oCC, should_re_scrape: bool = False):
     # Normalized number, eg: 111xxx-222.mp4 -> xxx-222.mp4
     debug = config.getInstance().debug()
     n_number = get_number(debug, os.path.basename(movie_path))
@@ -469,7 +471,7 @@ def create_data_and_move(movie_path: str, zero_op: bool, no_net_op: bool, oCC):
             if no_net_op:
                 core_main_no_net_op(movie_path, n_number)
             else:
-                core_main(movie_path, n_number, oCC)
+                core_main(movie_path, n_number, oCC, should_re_scrape=should_re_scrape)
         else:
             print("[-] number empty ERROR")
             moveFailedFolder(movie_path)
@@ -483,7 +485,7 @@ def create_data_and_move(movie_path: str, zero_op: bool, no_net_op: bool, oCC):
                 if no_net_op:
                     core_main_no_net_op(movie_path, n_number)
                 else:
-                    core_main(movie_path, n_number, oCC)
+                    core_main(movie_path, n_number, oCC, should_re_scrape=should_re_scrape)
             else:
                 raise ValueError("number empty")
             print("[*]======================================================")
@@ -653,11 +655,60 @@ def main(args: tuple) -> Path:
             count_all = str(min(len(movie_list), stop_count))
 
         for movie_path in movie_list:  # 遍历电影列表 交给core处理
+            if os.path.exists(movie_path) and os.path.isfile(movie_path) and conf.ignore_file_size_less_than_mb():
+                ignore_size = conf.ignore_file_size_less_than_mb()
+                if ignore_size > 0 and os.path.getsize(movie_path) < ignore_size * 1024 * 1024:
+                    print("[!]Ignoring file " + movie_path)
+                    continue
+
+            jf_movie_nfo_path = os.path.join(os.path.dirname(movie_path), 'movie.nfo')
+            should_delete_jf_nfo = False
+            if os.path.exists(jf_movie_nfo_path) and os.path.isfile(jf_movie_nfo_path):
+                with open(jf_movie_nfo_path, 'r', encoding='utf-8', errors='ignore') as jf_movie_nfo_file:
+                    jf_movie_nfo_content = jf_movie_nfo_file.read()
+                    if not "originaltitle" in jf_movie_nfo_content:
+                        should_delete_jf_nfo = True
+            
+            if should_delete_jf_nfo:
+                try:
+                    os.remove(jf_movie_nfo_path)
+                except Exception as e:
+                    print(e)
+                    pass
+
+            nfo_path = str(Path(movie_path).with_suffix('.nfo'))
+            should_skip_nfo = False
+            should_re_scrape = False
+            if os.path.exists(nfo_path) and os.path.isfile(nfo_path):
+                with open(nfo_path, 'r', encoding='utf-8', errors='ignore') as nfo_file:
+                    try:
+                        nfo_content = nfo_file.read()
+                        if "originaltitle" in nfo_content and conf.skip_existing_nfo:
+                            should_skip_nfo = True
+                        xml_tree = etree.fromstring(nfo_content.encode(), etree.XMLParser())
+                        actor_name = sutils.getTreeElement(xml_tree, '//actor[1]/name[1]/text()[1]')
+                        director_name = sutils.getTreeElement(xml_tree, '//director[1]/text()[1]')
+                        maker_name = sutils.getTreeElement(xml_tree, '//director[1]/text()[1]')
+                        if (actor_name.strip().lower() == director_name.strip().lower() or 
+                            'anonymous' in actor_name.strip().lower() or 
+                            '佚名' in actor_name.strip().lower() or
+                            '' == actor_name.strip()):
+                            should_re_scrape = True
+                        if maker_name.strip().lower == 'fc2-ppv':
+                            should_re_scrape = True
+                    except Exception as e:
+                        print(e)
+
+            if should_skip_nfo:
+                if not should_re_scrape:
+                    print('[!]Skip existing NFO: ' + movie_path)
+                    continue
+
             count = count + 1
             percentage = str(count / int(count_all) * 100)[:4] + '%'
             print('[!] {:>30}{:>21}'.format('- ' + percentage + ' [' + str(count) + '/' + count_all + '] -',
                                             time.strftime("%H:%M:%S")))
-            create_data_and_move(movie_path, zero_op, no_net_op, oCC)
+            create_data_and_move(movie_path, zero_op, no_net_op, oCC, should_re_scrape=should_re_scrape)
             if count >= stop_count:
                 print("[!]Stop counter triggered!")
                 break

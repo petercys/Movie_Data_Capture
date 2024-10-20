@@ -829,7 +829,7 @@ def move_subtitles(filepath, path, multi_part, number, part, leak_word, c_word, 
     return result
 
 
-def core_main(movie_path, number_th, oCC, specified_source=None, specified_url=None):
+def core_main(movie_path, number_th, oCC, specified_source=None, specified_url=None, should_re_scrape=False):
     conf = config.getInstance()
     # =======================================================================初始化所需变量
     multi_part = False
@@ -852,7 +852,32 @@ def core_main(movie_path, number_th, oCC, specified_source=None, specified_url=N
     if not json_data:
         moveFailedFolder(movie_path)
         return
+    
+    if should_re_scrape:
+        actor_list = json_data.get('actor_list')
+        studio_name = json_data.get('studio')
+        
+        if actor_list and len(actor_list) == 1:
+            actor_name = str(actor_list[0]).strip().lower()
+            print("actor_name = " + actor_name)
+            if (actor_name == str(json_data.get('director')).strip().lower() or 
+                    'anonymous' in actor_name or 
+                    '佚名' in actor_name or
+                    '' == actor_name
+                ):
+                print("Actor name is the same as before. Skipping...")
+                return
+            else:
+                # Delete Jellyfin generated "movie.nfo" file
+                jf_movie_nfo_path = os.path.join(os.path.dirname(movie_path), 'movie.nfo')
+                try:
+                    if os.path.exists(jf_movie_nfo_path) and os.path.isfile(jf_movie_nfo_path):
+                        os.remove(jf_movie_nfo_path)
+                except:
+                    pass
+                print("Actor name is updated!")
 
+    
     if json_data["number"] != number:
         # fix issue #119
         # the root cause is we normalize the search id
