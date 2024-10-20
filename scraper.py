@@ -192,14 +192,14 @@ def get_data_from_json(
             try:
                 if json_data[translate_value] == "":
                     continue
-                if translate_value == "title":
-                    title_dict = json.loads(
-                        (Path.home() / '.local' / 'share' / 'mdc' / 'c_number.json').read_text(encoding="utf-8"))
-                    try:
-                        json_data[translate_value] = title_dict[number]
-                        continue
-                    except:
-                        pass
+                # if translate_value == "title":
+                #     title_dict = json.loads(
+                #         (Path.home() / '.local' / 'share' / 'mdc' / 'c_number.json').read_text(encoding="utf-8"))
+                #     try:
+                #         json_data[translate_value] = title_dict[number]
+                #         continue
+                #     except:
+                #         pass
                 if conf.get_translate_engine() == "azure":
                     t = translate(
                         json_data[translate_value],
