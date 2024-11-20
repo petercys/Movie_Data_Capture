@@ -457,7 +457,7 @@ def rm_empty_folder(path):
             pass
 
 
-def create_data_and_move(movie_path: str, zero_op: bool, no_net_op: bool, oCC, should_re_scrape: bool = False):
+def create_data_and_move(movie_path: str, zero_op: bool, no_net_op: bool, oCC, jellyfin_generated_exist: bool=False, should_re_scrape: bool=False):
     # Normalized number, eg: 111xxx-222.mp4 -> xxx-222.mp4
     debug = config.getInstance().debug()
     n_number = get_number(debug, os.path.basename(movie_path))
@@ -471,7 +471,7 @@ def create_data_and_move(movie_path: str, zero_op: bool, no_net_op: bool, oCC, s
             if no_net_op:
                 core_main_no_net_op(movie_path, n_number)
             else:
-                core_main(movie_path, n_number, oCC, should_re_scrape=should_re_scrape)
+                core_main(movie_path, n_number, oCC, jellyfin_generated_exist=jellyfin_generated_exist, should_re_scrape=should_re_scrape)
         else:
             print("[-] number empty ERROR")
             moveFailedFolder(movie_path)
@@ -485,7 +485,7 @@ def create_data_and_move(movie_path: str, zero_op: bool, no_net_op: bool, oCC, s
                 if no_net_op:
                     core_main_no_net_op(movie_path, n_number)
                 else:
-                    core_main(movie_path, n_number, oCC, should_re_scrape=should_re_scrape)
+                    core_main(movie_path, n_number, oCC, jellyfin_generated_exist=jellyfin_generated_exist, should_re_scrape=should_re_scrape)
             else:
                 raise ValueError("number empty")
             print("[*]======================================================")
@@ -671,44 +671,76 @@ def main(args: tuple) -> Path:
             
             if should_delete_jf_nfo:
                 try:
+                    print('[!]Deleting old Jellyfin NFO file')
                     os.remove(jf_movie_nfo_path)
                 except Exception as e:
                     print(e)
                     pass
 
             nfo_path = str(Path(movie_path).with_suffix('.nfo'))
-            should_skip_nfo = False
+            is_nfo_exist = os.path.exists(nfo_path) and os.path.isfile(nfo_path)
             should_re_scrape = False
-            if os.path.exists(nfo_path) and os.path.isfile(nfo_path):
+            is_jellyfin_generated_nfo = False
+
+            if is_nfo_exist:
                 with open(nfo_path, 'r', encoding='utf-8', errors='ignore') as nfo_file:
                     try:
                         nfo_content = nfo_file.read()
-                        if "originaltitle" in nfo_content and conf.skip_existing_nfo:
-                            should_skip_nfo = True
-                        xml_tree = etree.fromstring(nfo_content.encode(), etree.XMLParser())
-                        actor_name = sutils.getTreeElement(xml_tree, '//actor[1]/name[1]/text()[1]')
-                        director_name = sutils.getTreeElement(xml_tree, '//director[1]/text()[1]')
-                        maker_name = sutils.getTreeElement(xml_tree, '//director[1]/text()[1]')
-                        if (actor_name.strip().lower() == director_name.strip().lower() or 
-                            'anonymous' in actor_name.strip().lower() or 
-                            '佚名' in actor_name.strip().lower() or
-                            '' == actor_name.strip()):
-                            should_re_scrape = True
-                        if maker_name.strip().lower == 'fc2-ppv':
-                            should_re_scrape = True
+                        if "originaltitle" not in nfo_content:
+                            is_jellyfin_generated_nfo = True
+                        else:
+                            is_jellyfin_generated_nfo = False
+                            xml_tree = etree.fromstring(nfo_content.encode(), etree.XMLParser())
+                            actor_name = sutils.getTreeElement(xml_tree, '//actor[1]/name[1]/text()[1]')
+                            director_name = sutils.getTreeElement(xml_tree, '//director[1]/text()[1]')
+                            maker_name = sutils.getTreeElement(xml_tree, '//director[1]/text()[1]')
+                            if (actor_name.strip().lower() == director_name.strip().lower() or 
+                                'anonymous' in actor_name.strip().lower() or 
+                                '佚名' in actor_name.strip().lower() or
+                                '' == actor_name.strip()):
+                                should_re_scrape = True
+                            if maker_name.strip().lower == 'fc2-ppv':
+                                should_re_scrape = True
+                            if 'msin.' in nfo_content.lower() and not 'msinactorupdated' in nfo_content.lower():
+                                should_re_scrape = True
                     except Exception as e:
                         print(e)
 
-            if should_skip_nfo:
+                
+            if conf.skip_existing_nfo and is_nfo_exist and not is_jellyfin_generated_nfo:
+                # If scraped nfo is valid and has correct metadata
                 if not should_re_scrape:
                     print('[!]Skip existing NFO: ' + movie_path)
+
+                    # Check if movie.nfo has not been updated yet
+                    try:
+                        if os.path.exists(jf_movie_nfo_path) and os.path.isfile(jf_movie_nfo_path):
+                            with open(jf_movie_nfo_path, 'r', encoding='utf-8', errors='ignore') as jf_nfo_file:
+                                jf_nfo_content = jf_nfo_file.read()
+                                jf_xml_tree = etree.fromstring(jf_nfo_content.encode(), etree.XMLParser())
+                                jf_actor_name = sutils.getTreeElement(jf_xml_tree, '//actor[1]/name[1]/text()[1]')
+                                jf_director_name = sutils.getTreeElement(jf_xml_tree, '//director[1]/text()[1]')
+                                jf_maker_name = sutils.getTreeElement(jf_xml_tree, '//director[1]/text()[1]')
+                                if (jf_actor_name.strip().lower() == jf_director_name.strip().lower() or 
+                                    'anonymous' in jf_actor_name.strip().lower() or 
+                                    '佚名' in jf_actor_name.strip().lower() or
+                                    '' == jf_actor_name.strip() or
+                                    'fc2-ppv' == jf_maker_name.strip().lower):
+                                    should_delete_jf_nfo = True
+
+                            if should_delete_jf_nfo:
+                                print('[!]Deleting old Jellyfin NFO file')
+                                os.remove(jf_movie_nfo_path)
+                    except Exception as e:
+                        print(e)
+                    
                     continue
 
             count = count + 1
             percentage = str(count / int(count_all) * 100)[:4] + '%'
             print('[!] {:>30}{:>21}'.format('- ' + percentage + ' [' + str(count) + '/' + count_all + '] -',
                                             time.strftime("%H:%M:%S")))
-            create_data_and_move(movie_path, zero_op, no_net_op, oCC, should_re_scrape=should_re_scrape)
+            create_data_and_move(movie_path, zero_op, no_net_op, oCC, jellyfin_generated_exist=is_jellyfin_generated_nfo, should_re_scrape=should_re_scrape)
             if count >= stop_count:
                 print("[!]Stop counter triggered!")
                 break

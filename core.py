@@ -3,6 +3,8 @@ import pathlib
 import shutil
 import sys
 
+import scrapinglib.utils as sutils
+
 from PIL import Image
 from io import BytesIO
 from datetime import datetime
@@ -829,7 +831,7 @@ def move_subtitles(filepath, path, multi_part, number, part, leak_word, c_word, 
     return result
 
 
-def core_main(movie_path, number_th, oCC, specified_source=None, specified_url=None, should_re_scrape=False):
+def core_main(movie_path, number_th, oCC, specified_source=None, specified_url=None, jellyfin_generated_exist=False, should_re_scrape=False):
     conf = config.getInstance()
     # =======================================================================初始化所需变量
     multi_part = False
@@ -853,7 +855,7 @@ def core_main(movie_path, number_th, oCC, specified_source=None, specified_url=N
         moveFailedFolder(movie_path)
         return
     
-    if should_re_scrape:
+    if should_re_scrape and not jellyfin_generated_exist:
         actor_list = json_data.get('actor_list')
         studio_name = json_data.get('studio')
         
@@ -876,6 +878,61 @@ def core_main(movie_path, number_th, oCC, specified_source=None, specified_url=N
                 except:
                     pass
                 print("Actor name is updated!")
+
+                new_xml = None
+                nfo_path = str(Path(movie_path).with_suffix('.nfo'))
+                print('nfo_path = ' + nfo_path)
+                with open(nfo_path, 'r', encoding='utf-8', errors='ignore') as nfo_file:
+                    try:
+                        nfo_content = nfo_file.read()
+                        a_name = ('name>' + actor_name + '<')
+                        a_name = a_name.strip().lower().replace("\r\n","").replace("\n","").replace(" ", "")
+
+                        # print('a_name = ' + a_name)
+                        # print(nfo_content)
+
+                        if 'msin.' in nfo_content.lower():
+                            if ((a_name not in nfo_content.strip().lower().replace("\r\n","").replace("\n","").replace(" ", "")) and 
+                                ('msinactorupdated' not in nfo_content.lower())):
+                                print("Fixing msin old info...")
+                                xml_tree = etree.fromstring(nfo_content.encode(), etree.XMLParser())
+                                old_actor_name = sutils.getTreeElement(xml_tree, '//actor[1]/name[1]/text()[1]')
+                                if old_actor_name.strip().lower() != actor_name:
+                                    movie_ele = xml_tree
+                                    new_actor_ele = etree.Element('actor')
+
+                                    new_actor_name_ele = etree.Element('name')
+                                    new_actor_name_ele.text = actor_list[0] # actor_name is in lower and stripped
+
+                                    new_actor_type_ele = etree.Element('type')
+                                    new_actor_type_ele.text = 'Actor'
+
+                                    new_actor_ele.append(new_actor_name_ele)
+                                    new_actor_ele.append(new_actor_type_ele)
+
+                                    movie_ele.append(new_actor_ele)
+
+                                    new_fixed_status_ele = etree.Element('msinactorupdated')
+                                    new_fixed_status_ele.text = ''
+
+                                    movie_ele.append(new_fixed_status_ele)
+
+                                    new_xml = etree.tostring(movie_ele, encoding='unicode')
+                            else:
+                                print("File is already fixed!")
+                                return
+                    except Exception as e:
+                        print("Error occurred when fixing msin metadata...")
+                        print(e)
+                        return
+
+                if new_xml:
+                    with open(nfo_path, 'w', encoding='utf-8', errors='ignore') as nfo_file:
+                        try:
+                            nfo_file.write(new_xml)
+                        except:
+                            pass
+                    return
 
     
     if json_data["number"] != number:
@@ -1073,6 +1130,14 @@ def core_main(movie_path, number_th, oCC, specified_source=None, specified_url=N
         # 兼容Jellyfin封面图文件名规则
         if multi_part and conf.jellyfin_multi_part_fanart():
             linkImage(path, number_th, part, leak_word, c_word, hack_word, ext)
+
+        # Delete Jellyfin generated "movie.nfo" file
+        jf_movie_nfo_path = os.path.join(os.path.dirname(movie_path), 'movie.nfo')
+        try:
+            if os.path.exists(jf_movie_nfo_path) and os.path.isfile(jf_movie_nfo_path):
+                os.remove(jf_movie_nfo_path)
+        except:
+            pass
 
         # 最后输出.nfo元数据文件，以完成.nfo文件创建作为任务成功标志
         print_files(path, leak_word, c_word, json_data.get('naming_rule'), part, cn_sub, json_data, movie_path,
